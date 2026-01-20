@@ -5,7 +5,7 @@ on:
     branches:
       - 6.x
   schedule:
-    # Run Monday/Thursday at 12:13 GMT
+    # Run Monday/Thursday at 12:13 GMT.
     - cron: '13 12 * * 1,4'
   workflow_dispatch:
     inputs:
@@ -23,17 +23,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - drupal: '10.3.*'
-            civicrm: '5.78.*'
+          - drupal: '10.5.*'
+            civicrm: '6.4.*'
             php: '8.2'
-          - drupal: '10.3.*'
-            civicrm: '6.3.*'
-            php: '8.2'
-          - drupal: '10.4.*'
-            civicrm: '6.4.x-dev'
+          - drupal: '10.5.*'
+            civicrm: '6.9.x-dev'
             php: '8.3'
-          - drupal: '10.4.*'
+          - drupal: '10.6.*'
             civicrm: 'dev-master'
+            php: '8.3'
+          - drupal: '11.2.*'
+            civicrm: '6.8.*'
             php: '8.3'
           - drupal: '11.x-dev'
             civicrm: 'dev-master'
@@ -73,13 +73,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install sendmail
-      # Temp thing
-      - name: Downgrade chrome
-        run: |
-          curl -L -o chrome.deb http://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_127.0.6533.119-1_amd64.deb
-          sudo apt-get install libu2f-udev
-          sudo dpkg -i chrome.deb
-          google-chrome-stable --version
       - name: Setup Drupal
         run: |
           COMPOSER_MEMORY_LIMIT=-1 composer create-project drupal/recommended-project:${{ matrix.drupal }} ~/drupal --no-interaction --no-install
@@ -98,7 +91,7 @@ jobs:
           composer config repositories.0 composer https://packages.drupal.org/8
           composer config repositories.1 path $GITHUB_WORKSPACE
           composer install --no-interaction
-          COMPOSER_MEMORY_LIMIT=-1 composer require drupal/core-dev-pinned:${{ matrix.drupal }}
+          COMPOSER_MEMORY_LIMIT=-1 composer require drupal/core-dev:${{ matrix.drupal }} -w
       # This is done differently in drupal 11. See BROWSERTEST_OUTPUT_VERBOSE below.
       - name: Suppress links to screenshots
         # There's so many! They can be useful locally if running one test, but they aren't useful here and cause massive scrolling.
@@ -119,11 +112,13 @@ jobs:
       - name: Download Webform
         run: |
           cd ~/drupal
-          if [ "${{ env.ISDRUPAL11 }}" == "1" ]; then
-            COMPOSER_MEMORY_LIMIT=-1 composer require 'drupal/webform:6.3.x-dev@dev'
-          else
-            COMPOSER_MEMORY_LIMIT=-1 composer require 'drupal/webform:^6.2'
-          fi
+          # Use 6.x-dev to deal with newer chromedriver issues
+          COMPOSER_MEMORY_LIMIT=-1 composer require 'drupal/webform:6.x-dev'
+          #if [ "${{ env.ISDRUPAL11 }}" == "1" ]; then
+          #  COMPOSER_MEMORY_LIMIT=-1 composer require 'drupal/webform:6.3.x-dev@dev'
+          #else
+          #  COMPOSER_MEMORY_LIMIT=-1 composer require 'drupal/webform:^6.2'
+          #fi
       - name: Install webform_civicrm
         run: |
           cd ~/drupal
@@ -176,15 +171,13 @@ jobs:
           /home/runner/civicrm-cv/cv api3 Extension.download install=1 key=mjwshared
           /home/runner/civicrm-cv/cv api3 Extension.download install=1 key=firewall
           /home/runner/civicrm-cv/cv api3 Extension.download install=1 key=com.drastikbydesign.stripe
+          /home/runner/civicrm-cv/cv api3 Extension.download install=1 key=com.donordepot.authnetecheck
           /home/runner/civicrm-cv/cv api3 Extension.download install=0 key=com.iatspayments.civicrm
           # For uscounties, it hasn't had a release in a few years so no longer appears in the ext feed, so just download directly. If it ever does need an update, would need to update here.
           # /home/runner/civicrm-cv/cv api3 Extension.download install=0 key=com.aghstrategies.uscounties
           curl -L -O https://github.com/agh1/com.aghstrategies.uscounties/archive/2.1.zip
           unzip 2.1.zip
       - uses: nanasess/setup-chromedriver@master
-        with:
-          # temporary to match downgraded chrome
-          chromedriver-version: '127.0.6533.119'
       - name: Run chromedriver
         run: chromedriver --port=9515 &
       - name: Run php built-in server
